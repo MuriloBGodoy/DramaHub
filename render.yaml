@@ -1,0 +1,21 @@
+# Backend no Render (plano free). Crie o Postgres gratis no Neon (neon.tech) e preencha as envs.
+services:
+  - type: web
+    name: dramahub-api
+    runtime: docker
+    rootDir: backend
+    plan: free
+    healthCheckPath: /api/auth/status
+    envVars:
+      - key: JDBC_DATABASE_URL     # jdbc:postgresql://HOST/DB?sslmode=require
+        sync: false
+      - key: DB_USER
+        sync: false
+      - key: DB_PASSWORD
+        sync: false
+      - key: INVITE_CODE           # opcional: exige codigo para criar conta
+        sync: false
+      - key: ALLOWED_ORIGINS       # ex: https://dramahub.netlify.app
+        sync: false
+      - key: H2_CONSOLE
+        value: "false"

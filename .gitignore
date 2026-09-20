@@ -1,0 +1,20 @@
+# backend
+backend/target/
+backend/data/
+backend/media/
+backend/src/main/resources/static/
+backend/.mvn/wrapper/*.jar
+
+# frontend
+frontend/node_modules/
+frontend/dist/
+
+# ide / os
+.idea/
+.vscode/
+*.iml
+.DS_Store
+Thumbs.db
+
+# segredos locais
+.env
