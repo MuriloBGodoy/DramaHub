@@ -50,17 +50,23 @@ const YouTubePlayer = forwardRef(function YouTubePlayer(
       if (disposed || !hostRef.current) return
       playerRef.current = new YT.Player(hostRef.current, {
         videoId,
-        playerVars: { autoplay: 1, playsinline: 1, controls: 0, rel: 0, modestbranding: 1, iv_load_policy: 3, disablekb: 1, start: Math.floor(start), hl: 'pt' },
+        playerVars: { autoplay: 1, playsinline: 1, controls: 0, rel: 0, modestbranding: 1, iv_load_policy: 3, cc_load_policy: 0, disablekb: 1, start: Math.floor(start), hl: 'pt' },
         events: {
           onReady: (e) => {
             if (muted) e.target.mute()
+            // Legendas automáticas do YouTube desligadas: os dramas já têm legenda queimada no vídeo e, com o
+            // iframe preenchendo a tela, a caixa de legenda do YouTube ficaria cortada nas laterais.
+            try { e.target.unloadModule('captions'); e.target.unloadModule('cc') } catch { /* sem módulo */ }
             handlers.current.onLoadedMetadata?.()
             e.target.playVideo()
             timerRef.current = setInterval(() => handlers.current.onTimeUpdate?.(), 250)
           },
           onStateChange: (e) => {
             const S = YT.PlayerState
-            if (e.data === S.PLAYING) { handlers.current.onPlaying?.(); handlers.current.onPlay?.() }
+            if (e.data === S.PLAYING) {
+              try { e.target.unloadModule('captions') } catch { /* sem módulo */ }
+              handlers.current.onPlaying?.(); handlers.current.onPlay?.()
+            }
             else if (e.data === S.PAUSED) handlers.current.onPause?.()
             else if (e.data === S.BUFFERING) handlers.current.onWaiting?.()
             else if (e.data === S.ENDED) handlers.current.onEnded?.()

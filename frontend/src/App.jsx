@@ -23,7 +23,7 @@ function Shell() {
     return () => window.removeEventListener('dramahub:logout', h)
   }, [logout])
 
-  if (user === undefined) return <div className="splash"><div className="brand">Drama<span>Hub</span></div></div>
+  if (user === undefined) return <div className="splash"><div className="brand">DramaHub</div></div>
   if (!user) return <Login />
 
   const fullscreen = pathname.startsWith('/assistir')

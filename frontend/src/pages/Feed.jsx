@@ -1,24 +1,26 @@
 import { useEffect, useRef, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import { api, mediaUrl } from '../api'
-import { HeartIcon, MuteIcon, PlayIcon } from '../components/Icons'
+import { VerticalFrame } from '../components/Cover'
+import { HeartIcon, ListIcon, MuteIcon, PlayIcon } from '../components/Icons'
+import { buildEps, fmtDur } from '../eps'
 
-/** Feed vertical estilo TikTok/DramaBox: primeiro episodio de cada serie, com autoplay do item visivel. */
+/** Feed vertical estilo TikTok/DramaBox: primeiro episódio de cada série, com autoplay do item visível. */
 export default function Feed() {
-  const [items, setItems] = useState([])
+  const [items, setItems] = useState(null)
   const [active, setActive] = useState(0)
   const [muted, setMuted] = useState(true)
   const containerRef = useRef(null)
 
-  // "Para voce": amostra embaralhada do catalogo a cada visita
+  // "Para você": amostra embaralhada do catálogo a cada visita
   useEffect(() => {
-    api.feed().then((list) => setItems(list.sort(() => Math.random() - 0.5).slice(0, 40))).catch(() => {})
+    api.feed().then((list) => setItems(list.sort(() => Math.random() - 0.5).slice(0, 40))).catch(() => setItems([]))
   }, [])
 
-  // Descobre qual item esta na tela
+  // Descobre qual item está na tela
   useEffect(() => {
     const root = containerRef.current
-    if (!root || !items.length) return
+    if (!root || !items?.length) return
     const obs = new IntersectionObserver(
       (entries) => {
         entries.forEach((en) => {
@@ -31,27 +33,34 @@ export default function Feed() {
     return () => obs.disconnect()
   }, [items])
 
-  if (!items.length) return <div className="empty" style={{ paddingTop: 120 }}>Carregando o feed...</div>
+  if (items === null) return <div className="feed"><div className="feed-item skeleton" /></div>
+  if (!items.length) {
+    return (
+      <div className="state">
+        <h3>Nada no feed ainda</h3>
+        <p>Quando houver dramas no catálogo, eles aparecem aqui um atrás do outro.</p>
+        <Link className="btn" to="/">Voltar ao início</Link>
+      </div>
+    )
+  }
 
   return (
     <div className="feed" ref={containerRef}>
+      <div className="feed-top"><span>Para você</span></div>
       {items.map((ep, i) => (
-        <FeedItem key={ep.id} ep={ep} index={i} active={i === active} near={Math.abs(i - active) <= 1} muted={muted} />
+        <FeedItem key={ep.id} ep={ep} index={i} active={i === active} near={Math.abs(i - active) <= 1} muted={muted} onMute={() => setMuted((m) => !m)} />
       ))}
-      <div className="feed-top">Para você</div>
-      <button className="icon-btn feed-mute" onClick={() => setMuted((m) => !m)}>
-        <MuteIcon muted={muted} />
-      </button>
     </div>
   )
 }
 
-function FeedItem({ ep, index, active, near, muted }) {
+function FeedItem({ ep, index, active, near, muted, onMute }) {
   const navigate = useNavigate()
   const videoRef = useRef(null)
   const [paused, setPaused] = useState(false)
   const [fav, setFav] = useState(false)
   const start = ep.startSec || 0
+  const eps = buildEps([ep])
 
   useEffect(() => {
     api.isFavorite(ep.seriesId).then((r) => setFav(r.favorite)).catch(() => {})
@@ -61,8 +70,7 @@ function FeedItem({ ep, index, active, near, muted }) {
     const v = videoRef.current
     if (!v || ep.youtubeId) return
     if (active) {
-      setPaused(false)
-      v.play().catch(() => setPaused(true))
+      v.play().then(() => setPaused(false)).catch(() => setPaused(true))
     } else {
       v.pause()
       v.currentTime = start
@@ -71,7 +79,7 @@ function FeedItem({ ep, index, active, near, muted }) {
 
   const onTimeUpdate = () => {
     const v = videoRef.current
-    if (ep.endSec && v.currentTime >= ep.endSec) v.currentTime = start // loop dentro do episodio
+    if (ep.endSec && v.currentTime >= ep.endSec) v.currentTime = start // loop dentro do episódio
   }
 
   const toggle = () => {
@@ -79,14 +87,18 @@ function FeedItem({ ep, index, active, near, muted }) {
     if (v.paused) { v.play().catch(() => {}); setPaused(false) } else { v.pause(); setPaused(true) }
   }
 
+  const watch = () => navigate(`/assistir/${ep.id}`)
+
   return (
     <div className="feed-item" data-index={index}>
-      {ep.thumbnailUrl && <img className="poster" src={ep.thumbnailUrl} alt="" loading="lazy" />}
       {ep.youtubeId ? (
-        <img className="yt-poster" src={ep.thumbnailUrl} alt="" loading="lazy" onClick={() => navigate(`/assistir/${ep.id}`)} />
-      ) : near && (
+        <button className="feed-media" onClick={watch} aria-label={`Assistir ${ep.seriesTitle}`}>
+          <VerticalFrame youtubeId={ep.youtubeId} fallback={ep.thumbnailUrl || ep.seriesCoverUrl} title={ep.seriesTitle} />
+        </button>
+      ) : near ? (
         <video
           ref={videoRef}
+          className="feed-media"
           src={mediaUrl(ep.streamUrl)}
           poster={ep.thumbnailUrl || undefined}
           muted={muted}
@@ -96,30 +108,29 @@ function FeedItem({ ep, index, active, near, muted }) {
           onTimeUpdate={onTimeUpdate}
           onClick={toggle}
         />
-      )}
-      {ep.youtubeId && (
-        <button className="icon-btn big" style={{ position: 'absolute' }} onClick={() => navigate(`/assistir/${ep.id}`)}><PlayIcon /></button>
+      ) : (
+        <div className="feed-media" />
       )}
       {paused && !ep.youtubeId && (
-        <button className="icon-btn big" style={{ position: 'absolute' }} onClick={toggle}><PlayIcon /></button>
+        <button className="ctl big feed-play" onClick={toggle} aria-label="Tocar"><PlayIcon /></button>
       )}
 
-      <div className="feed-side">
-        <button onClick={() => api.toggleFavorite(ep.seriesId).then((r) => setFav(r.favorite))}>
-          <span className="icon-btn" style={fav ? { color: 'var(--accent)' } : undefined}><HeartIcon filled={fav} /></span>
-          {fav ? 'Salvo' : 'Salvar'}
+      <div className="rail">
+        <button onClick={() => api.toggleFavorite(ep.seriesId).then((r) => setFav(r.favorite)).catch(() => {})} aria-pressed={fav}>
+          <span className={`ric ${fav ? 'on' : ''}`}><HeartIcon filled={fav} /></span>{fav ? 'Salvo' : 'Salvar'}
         </button>
+        <button onClick={() => navigate(`/series/${ep.seriesId}`)}>
+          <span className="ric"><ListIcon /></span>{eps.length > 1 ? `${eps.length} EPs` : 'Série'}
+        </button>
+        {!ep.youtubeId && (
+          <button onClick={onMute} aria-pressed={muted}><span className="ric"><MuteIcon muted={muted} /></span>{muted ? 'Sem som' : 'Som'}</button>
+        )}
       </div>
 
       <div className="feed-info">
-        <h2>{ep.seriesTitle}</h2>
-        <p>EP {ep.number} · {ep.title}</p>
-        <div className="hero-actions">
-          <button className="btn btn-primary" onClick={() => navigate(`/assistir/${ep.id}`)}>
-            <PlayIcon /> Assistir
-          </button>
-          <button className="btn btn-ghost" onClick={() => navigate(`/series/${ep.seriesId}`)}>Ver série</button>
-        </div>
+        <h3>{ep.seriesTitle}</h3>
+        <span className="meta">{eps.length > 1 ? `${eps.length} EPs` : `EP ${ep.number}`}{ep.durationSec ? ` · ${fmtDur(ep.durationSec)}` : ''}</span>
+        <button className="btn wide" onClick={watch}><PlayIcon />Assistir EP 1</button>
       </div>
     </div>
   )

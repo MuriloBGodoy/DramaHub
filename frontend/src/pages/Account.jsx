@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { api } from '../api'
 import { useAuth } from '../auth'
+import { StudioIcon } from '../components/Icons'
 
 const AVATARS = ['💖', '🎬', '🍿', '🌸', '🔥', '👑', '🐺', '🦋', '🌙', '⭐', '🐉', '🎀']
 
@@ -45,7 +46,7 @@ export default function Account() {
 
   return (
     <div className="page">
-      <h1 className="page-title">Conta</h1>
+      <h1 className="page-title">Perfil</h1>
 
       <div className="account-head">
         <div className="avatar big">{user.avatar}</div>
@@ -57,9 +58,9 @@ export default function Account() {
 
       {!standalone && (
         <div className="notice info" style={{ marginBottom: 16 }}>
-          📱 <b>Instalar como app:</b>{' '}
+          <b>Instalar como app:</b>{' '}
           {installEvt ? (
-            <button className="btn btn-primary btn-sm" onClick={() => installEvt.prompt()}>Instalar DramaHub</button>
+            <button className="btn btn-sm" onClick={() => installEvt.prompt()}>Instalar DramaHub</button>
           ) : isIos ? (
             <>no Safari, toque em <b>Compartilhar</b> → <b>Adicionar à Tela de Início</b>.</>
           ) : (
@@ -69,7 +70,7 @@ export default function Account() {
       )}
 
       {isAdmin && (
-        <Link to="/estudio" className="btn btn-ghost" style={{ marginBottom: 16 }}>🎬 Abrir o Estúdio (catálogo)</Link>
+        <Link to="/estudio" className="ghost wide" style={{ marginBottom: 16 }}><StudioIcon />Abrir o Estúdio (catálogo)</Link>
       )}
 
       {msg && <div className={`notice ${msg.type}`} style={{ marginBottom: 12 }}>{msg.text}</div>}
@@ -86,7 +87,7 @@ export default function Account() {
           <label>Senha atual<input type="password" autoComplete="current-password" value={form.currentPassword} onChange={(e) => setForm({ ...form, currentPassword: e.target.value })} placeholder="só pra trocar a senha" /></label>
           <label>Nova senha<input type="password" autoComplete="new-password" value={form.newPassword} onChange={(e) => setForm({ ...form, newPassword: e.target.value })} /></label>
         </div>
-        <button className="btn btn-primary">Salvar</button>
+        <button className="btn">Salvar</button>
       </form>
 
       <div className="form">
@@ -103,7 +104,7 @@ export default function Account() {
         ))}
       </div>
 
-      <button className="btn btn-ghost" onClick={logout}>Sair deste dispositivo</button>
+      <button className="ghost wide" onClick={logout}>Sair deste dispositivo</button>
     </div>
   )
 }

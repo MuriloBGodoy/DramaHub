@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { api } from '../api'
 import SeriesCard from '../components/SeriesCard'
-import { SearchIcon } from '../components/Icons'
+import { SearchIcon, SparkIcon } from '../components/Icons'
 
 export default function Search() {
   const [params, setParams] = useSearchParams()
@@ -27,29 +27,38 @@ export default function Search() {
   return (
     <div className="page">
       <h1 className="page-title">Buscar</h1>
-      <div className="search-box">
+      <label className="search-box">
         <SearchIcon />
         <input
+          type="search"
+          enterKeyHint="search"
+          aria-label="Buscar dramas"
           placeholder="Título, tema, tag..."
           value={q}
           onChange={(e) => setQ(e.target.value)}
           autoFocus
         />
-      </div>
+      </label>
       <div className="chips">
-        <button className={`chip ${source ? 'active' : ''}`} onClick={toggleSource}>✨ IA</button>
-        <button className={`chip ${!genre ? 'active' : ''}`} onClick={() => setGenre('')}>Todos</button>
+        <button className={`chip ${!genre ? 'on' : ''}`} onClick={() => setGenre('')}>Todos</button>
         {genres.map((g) => (
-          <button key={g} className={`chip ${genre === g ? 'active' : ''}`} onClick={() => setGenre(g)}>{g}</button>
+          <button key={g} className={`chip ${genre === g ? 'on' : ''}`} onClick={() => setGenre(g)}>{g}</button>
         ))}
+        <button className={`chip ${source ? 'on' : ''}`} onClick={toggleSource} aria-pressed={!!source}><SparkIcon />Feitos com IA</button>
       </div>
 
       {results === null ? (
-        <div className="grid">{[...Array(6)].map((_, i) => <div key={i} className="skeleton" style={{ aspectRatio: '2/3' }} />)}</div>
+        <div className="grid">{[...Array(6)].map((_, i) => <div key={i} className="pc"><div className="po skeleton" /></div>)}</div>
       ) : results.length === 0 ? (
-        <div className="empty">Nada encontrado.</div>
+        <div className="state">
+          <h3>Nada encontrado</h3>
+          <p>{q ? <>Nenhum drama com “{q}”{genre ? ` em ${genre}` : ''}. Tente outra palavra ou tire o filtro.</> : 'Nenhum drama neste filtro.'}</p>
+        </div>
       ) : (
-        <div className="grid">{results.map((s) => <SeriesCard key={s.id} series={s} />)}</div>
+        <>
+          <p className="count">{results.length} {results.length === 1 ? 'drama' : 'dramas'}</p>
+          <div className="grid">{results.map((s) => <SeriesCard key={s.id} series={s} />)}</div>
+        </>
       )}
     </div>
   )

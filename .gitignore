@@ -18,3 +18,6 @@ Thumbs.db
 
 # segredos locais
 .env
+
+# moodboard do Jesse (arte de terceiros, so local)
+frontend/ui designs/

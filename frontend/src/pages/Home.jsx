@@ -1,92 +1,142 @@
-import { useEffect, useState } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
+import { useEffect, useMemo, useState } from 'react'
+import { Link } from 'react-router-dom'
 import { api } from '../api'
 import { useAuth } from '../auth'
-import { Row } from '../components/SeriesCard'
-import Cover from '../components/Cover'
-import { PlayIcon } from '../components/Icons'
+import SeriesCard, { Row } from '../components/SeriesCard'
+import Cover, { VerticalFrame } from '../components/Cover'
+import { PlayIcon, SearchIcon, SparkIcon } from '../components/Icons'
+import { buildEps, fmtDur, progressInfo, totalDuration } from '../eps'
+import { ytIdFrom } from '../yt'
+
+const AI_TAB = '__ai'
 
 export default function Home() {
-  const { user } = useAuth()
-  const navigate = useNavigate()
+  const { isAdmin } = useAuth()
   const [series, setSeries] = useState(null)
   const [cont, setCont] = useState([])
+  const [hero, setHero] = useState([])
   const [error, setError] = useState(null)
+  const [tab, setTab] = useState('')
 
   useEffect(() => {
     api.series().then(setSeries).catch((e) => setError(e.message))
     api.continueWatching().then(setCont).catch(() => {})
   }, [])
 
-  const featured = series?.find((s) => s.featured) || series?.[0]
-  const byGenre = {}
-  series?.forEach((s) => { (byGenre[s.genre || 'Outros'] ||= []).push(s) })
+  // Carrossel: as séries em destaque com o detalhe (duração e 1º episódio vêm só do detalhe)
+  const featured = useMemo(() => {
+    if (!series) return []
+    const f = series.filter((s) => s.featured)
+    return (f.length ? f : series).slice(0, 6)
+  }, [series])
+
+  useEffect(() => {
+    if (!featured.length) return
+    let off = false
+    Promise.all(featured.map((s) => api.seriesDetail(s.id).catch(() => null)))
+      .then((list) => { if (!off) setHero(list.filter((d) => d && d.episodes.length)) })
+    return () => { off = true }
+  }, [featured])
+
+  const byGenre = useMemo(() => {
+    const g = {}
+    series?.forEach((s) => { (g[s.genre || 'Outros'] ||= []).push(s) })
+    return Object.entries(g).sort((a, b) => b[1].length - a[1].length)
+  }, [series])
+
+  const ai = series?.filter((s) => s.source === 'ai') || []
+  const tabs = [['', 'Para você'], ...byGenre.filter(([, l]) => l.length > 1).map(([g]) => [g, g]), ...(ai.length ? [[AI_TAB, 'IA']] : [])]
+  const filtered = tab === AI_TAB ? ai : tab ? series?.filter((s) => (s.genre || 'Outros') === tab) : null
 
   return (
-    <>
-      <header className="topbar">
-        <div className="brand">Drama<span>Hub</span></div>
-        <Link className="avatar" title="Conta" to="/conta">{user.avatar}</Link>
-      </header>
+    <div className="home">
+      <div className="tabs">
+        <div className="tl" role="tablist">
+          {tabs.map(([k, l]) => (
+            <button key={k || 'pv'} role="tab" aria-selected={tab === k} className={tab === k ? 'on' : ''} onClick={() => setTab(k)}>{l}</button>
+          ))}
+        </div>
+        <Link className="ib plain" to="/buscar" aria-label="Buscar"><SearchIcon /></Link>
+      </div>
 
-      <div className="page" style={{ paddingTop: 0 }}>
-        {error && <div className="notice err">Não consegui falar com o servidor: {error}. O backend está rodando?</div>}
-        {!series && !error && <div className="hero skeleton" />}
+      {error && (
+        <div className="state">
+          <h3>Não consegui falar com o servidor</h3>
+          <p>{error}. Confira se o backend está rodando e tente de novo.</p>
+          <button className="btn" onClick={() => window.location.reload()}>Tentar de novo</button>
+        </div>
+      )}
 
-        {featured && (
-          <div className="hero">
-            <Cover src={featured.coverUrl} title={featured.title} />
-            <div className="hero-fade" />
-            <div className="hero-body">
-              <div className="card-sub" style={{ marginBottom: 6, color: 'var(--accent)', fontWeight: 700 }}>
-                EM DESTAQUE · {featured.genre}
-              </div>
-              <h2>{featured.title}</h2>
-              <p>{featured.synopsis}</p>
-              <div className="hero-actions">
-                <button className="btn btn-primary" onClick={() => navigate(`/series/${featured.id}`)}>
-                  <PlayIcon /> Assistir
-                </button>
-                <Link className="btn btn-ghost" to={`/series/${featured.id}`}>Detalhes</Link>
-              </div>
-            </div>
-          </div>
-        )}
+      {!series && !error && (
+        <>
+          <div className="car"><div className="hc skeleton" /><div className="hc skeleton" /></div>
+          <div className="row"><div className="sc">{[0, 1, 2].map((i) => <div key={i} className="lc"><div className="th skeleton" /></div>)}</div></div>
+        </>
+      )}
 
-        {cont.length > 0 && (
-          <section className="row">
-            <div className="row-head"><h3>Continuar assistindo</h3></div>
-            <div className="scroller">
-              {cont.map(({ series: s, progress: p }) => {
-                const dur = p.episode.durationSec || 1
-                const pct = p.completed ? 100 : Math.min(100, (p.positionSec / dur) * 100)
+      {series?.length === 0 && (
+        <div className="state">
+          <h3>Nenhum drama ainda</h3>
+          <p>O catálogo está vazio.{isAdmin && <> Cadastre ou importe o primeiro no <Link to="/estudio" className="u">Estúdio</Link>.</>}</p>
+        </div>
+      )}
+
+      {filtered && (
+        <section className="row">
+          <div className="row-h"><h2>{tab === AI_TAB ? 'Feitos com IA' : tab} <small>{filtered.length}</small></h2></div>
+          <div className="grid">{filtered.map((s) => <SeriesCard key={s.id} series={s} />)}</div>
+        </section>
+      )}
+
+      {series?.length > 0 && !filtered && (
+        <>
+          {hero.length > 0 && (
+            <div className="car">
+              {hero.map((d) => {
+                const eps = buildEps(d.episodes)
+                const yt = d.episodes[0].youtubeId || ytIdFrom(d.coverUrl)
                 return (
-                  <Link key={s.id} to={`/assistir/${p.episodeId}`} className="card cw-card">
-                    <div className="card-cover cw-cover">
-                      <Cover src={p.episode.thumbnailUrl || s.coverUrl} title={s.title} />
-                      <span className="ep">EP {p.episodeNumber}{p.completed ? ' · concluído' : ''}</span>
-                      <div className="progress-bar"><i style={{ width: `${pct}%` }} /></div>
+                  <div key={d.id} className="hc">
+                    <Link to={`/series/${d.id}`} className="hc-link" aria-label={d.title}>
+                      <VerticalFrame key={yt || d.id} youtubeId={yt} fallback={d.coverUrl} title={d.title} />
+                    </Link>
+                    <div className="hc-i">
+                      <span className="meta">{d.genre} · {eps.length} {eps.length === 1 ? 'EP' : 'EPs'} · {fmtDur(totalDuration(d.episodes))}</span>
+                      <Link to={`/series/${d.id}`}><h3>{d.title}</h3></Link>
+                      <Link to={`/assistir/${d.episodes[0].id}`} className="btn"><PlayIcon />Assistir EP 1</Link>
                     </div>
-                    <div className="card-title">{s.title}</div>
-                  </Link>
+                  </div>
                 )
               })}
             </div>
-          </section>
-        )}
+          )}
 
-        {series && <Row title="✨ Feitos com IA" items={series.filter((s) => s.source === 'ai').slice(0, 30)} to="/buscar?source=ai" />}
-        {series && <Row title="Novidades" items={series.slice(0, 10)} to="/buscar" />}
-        {Object.entries(byGenre).map(([g, items]) => (
-          <Row key={g} title={`${g} · ${items.length}`} items={items.slice(0, 30)} to={`/buscar?genre=${encodeURIComponent(g)}`} />
-        ))}
+          {cont.length > 0 && (
+            <section className="row">
+              <div className="row-h"><h2>Continuar assistindo</h2></div>
+              <div className="sc">
+                {cont.map(({ series: s, progress: p }) => {
+                  const info = progressInfo(p)
+                  return (
+                    <Link key={s.id} to={`/assistir/${p.episodeId}`} className="lc">
+                      <div className="th"><Cover src={p.episode.thumbnailUrl || s.coverUrl} title={s.title} /></div>
+                      <div className="pb"><i style={{ width: `${Math.max(2, info.pct)}%` }} /></div>
+                      <div className="s"><b>EP {info.ep}{info.of ? `/${info.of}` : ''}</b> · {info.left}</div>
+                      <div className="t">{s.title}</div>
+                    </Link>
+                  )
+                })}
+              </div>
+            </section>
+          )}
 
-        {series?.length === 0 && (
-          <div className="empty">
-            Nenhum drama ainda. Vá no <Link to="/estudio" style={{ color: 'var(--accent)' }}>Estúdio</Link> e cadastre o primeiro!
-          </div>
-        )}
-      </div>
-    </>
+          {ai.length > 0 && <Row title={<><SparkIcon />Feitos com IA</>} items={ai.slice(0, 20)} to="/buscar?source=ai" />}
+          {byGenre.map(([g, items]) => (
+            <Row key={g} title={g} items={items.slice(0, 20)} to={`/buscar?genre=${encodeURIComponent(g)}`} />
+          ))}
+        </>
+      )}
+      <div className="endpad" />
+    </div>
   )
 }

@@ -32,9 +32,9 @@ export default function Login() {
     <div className="login">
       <div className="login-bg" />
       <div className="login-card">
-        <div className="brand" style={{ fontSize: 36, textAlign: 'center' }}>Drama<span>Hub</span></div>
+        <div className="brand">DramaHub</div>
         <p className="login-sub">
-          {!status.hasUsers ? 'Crie a primeira conta — ela será a administradora.' : mode === 'login' ? 'Bom te ver de novo 💕' : 'Crie sua conta pra guardar seu progresso em qualquer dispositivo.'}
+          {!status.hasUsers ? 'Crie a primeira conta — ela será a administradora.' : mode === 'login' ? 'Bom te ver de novo.' : 'Crie sua conta pra guardar seu progresso em qualquer dispositivo.'}
         </p>
 
         {status.hasUsers && (
@@ -59,14 +59,14 @@ export default function Login() {
           <label>Senha
             <div className="pass-wrap">
               <input required type={showPass ? 'text' : 'password'} minLength={6} autoComplete={mode === 'login' ? 'current-password' : 'new-password'} value={form.password} onChange={set('password')} placeholder="mínimo 6 caracteres" />
-              <button type="button" onClick={() => setShowPass((s) => !s)}>{showPass ? 'ocultar' : 'mostrar'}</button>
+              <button type="button" onClick={() => setShowPass((s) => !s)} aria-pressed={showPass}>{showPass ? 'ocultar' : 'mostrar'}</button>
             </div>
           </label>
           {mode === 'register' && status.inviteRequired && (
             <label>Código de convite<input required value={form.inviteCode} onChange={set('inviteCode')} placeholder="peça pra quem te convidou" /></label>
           )}
           {error && <div className="notice err">{error}</div>}
-          <button className="btn btn-primary" disabled={busy} style={{ marginTop: 6 }}>
+          <button className="btn wide" disabled={busy} style={{ marginTop: 6 }}>
             {busy ? '...' : mode === 'login' ? 'Entrar' : 'Criar conta'}
           </button>
         </form>

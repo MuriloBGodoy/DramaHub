@@ -17,8 +17,8 @@ export default defineConfig({
         start_url: '/',
         display: 'standalone',
         orientation: 'portrait',
-        background_color: '#0b0b10',
-        theme_color: '#0b0b10',
+        background_color: '#0B0B0C',
+        theme_color: '#0B0B0C',
         icons: [
           { src: '/icons/icon-192.png', sizes: '192x192', type: 'image/png' },
           { src: '/icons/icon-512.png', sizes: '512x512', type: 'image/png' },
@@ -26,6 +26,8 @@ export default defineConfig({
         ],
       },
       workbox: {
+        // inclui a fonte Geist (woff2) no precache para o app abrir offline com a tipografia certa
+        globPatterns: ['**/*.{js,css,html,svg,png,woff2}'],
         // app shell em cache; API com rede primeiro (e cache de reserva para abrir offline)
         navigateFallback: '/index.html',
         navigateFallbackDenylist: [/^\/api\//, /^\/h2/],
