@@ -2,7 +2,6 @@ import { useEffect } from 'react'
 import { BrowserRouter, Navigate, Route, Routes, useLocation } from 'react-router-dom'
 import { AuthProvider, useAuth } from './auth'
 import Nav from './components/Nav'
-import Login from './pages/Login'
 import Home from './pages/Home'
 import Feed from './pages/Feed'
 import Search from './pages/Search'
@@ -13,18 +12,28 @@ import Studio from './pages/Studio'
 import Account from './pages/Account'
 
 function Shell() {
-  const { user, isAdmin, logout } = useAuth()
+  const { user, isAdmin, start } = useAuth()
   const { pathname } = useLocation()
 
-  // token expirado/revogado em outra aba ou dispositivo -> volta para o login
+  // sessão apagada no servidor -> cria outra
   useEffect(() => {
-    const h = () => logout()
-    window.addEventListener('dramahub:logout', h)
-    return () => window.removeEventListener('dramahub:logout', h)
-  }, [logout])
+    const h = () => start()
+    window.addEventListener('dramahub:session-lost', h)
+    return () => window.removeEventListener('dramahub:session-lost', h)
+  }, [start])
 
   if (user === undefined) return <div className="splash"><div className="brand">DramaHub</div></div>
-  if (!user) return <Login />
+  if (!user) {
+    return (
+      <div className="splash">
+        <div className="splash-err">
+          <div className="brand">DramaHub</div>
+          <p className="card-sub">Não foi possível conectar ao servidor.</p>
+          <button className="btn" onClick={start}>Tentar de novo</button>
+        </div>
+      </div>
+    )
+  }
 
   const fullscreen = pathname.startsWith('/assistir')
   return (

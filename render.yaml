@@ -13,7 +13,7 @@ services:
         sync: false
       - key: DB_PASSWORD
         sync: false
-      - key: INVITE_CODE           # opcional: exige codigo para criar conta
+      - key: ADMIN_CODE            # codigo que libera o Estudio (alterar o catalogo)
         sync: false
       - key: ALLOWED_ORIGINS       # ex: https://dramahub.netlify.app
         sync: false

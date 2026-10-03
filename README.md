@@ -15,20 +15,18 @@ sem paywall, com catálogo próprio. Feito para a Julia.
      personagens, episódios, diálogos e prompts de vídeo) e vocês geram os clipes e fazem o upload.
   4. Vídeos com licença livre (Creative Commons) — os *open movies* da Blender vêm como exemplo.
 
-## Contas e dispositivos
+## Sessões (sem login)
 
-- Cadastro com e-mail e senha (BCrypt). **A primeira conta criada é a administradora** — só ela vê o Estúdio
-  e pode alterar o catálogo. As demais só assistem.
-- Cada login gera um token **por dispositivo**; em **Conta** dá pra ver "Chrome · Android", "Safari · iPhone"...
-  e desconectar qualquer um. Progresso e favoritos ficam na conta, então trocar de aparelho não perde nada.
-- Para fechar o cadastro pra estranhos, defina a env `INVITE_CODE` — quem for criar conta precisa digitar o código.
-- Quem usava o app na versão sem login (perfis Julia/Murilo) tem o progresso migrado pra conta no primeiro login
-  no mesmo navegador.
+- Não tem cadastro nem senha: na primeira visita cada navegador ganha uma **sessão anônima** (token aleatório
+  salvo no `localStorage`; no banco só fica o hash). Progresso, favoritos, nome e avatar ficam nessa sessão.
+- Outro aparelho ou dados do navegador apagados = sessão nova. Em **Perfil → Começar do zero** dá pra apagar a atual.
+- **Estúdio**: se a env `ADMIN_CODE` estiver definida, só sessões liberadas com esse código (Perfil → Estúdio)
+  alteram o catálogo. Sem `ADMIN_CODE` (uso local) qualquer sessão pode. **Em produção, defina `ADMIN_CODE`.**
 
 ## PWA
 
 O app é instalável (manifest + service worker via `vite-plugin-pwa`): no Android/Chrome aparece o botão
-**Instalar** em *Conta*; no iPhone, Safari → Compartilhar → *Adicionar à Tela de Início*. O catálogo e as capas ficam em
+**Instalar** em *Perfil*; no iPhone, Safari → Compartilhar → *Adicionar à Tela de Início*. O catálogo e as capas ficam em
 cache pra abrir offline; os vídeos do YouTube precisam de internet.
 
 ## Rodando
@@ -67,7 +65,7 @@ Canais oficiais usados na carga inicial (uploads completos, ≥ 40 min):
 Canais que **não** servem: DramaBox PT, ReelShort Brasil, iQIYI Portuguese e DramaWave só publicam trechos
 de 10–30 min ou escondem os episódios depois do 5º.
 
-Para repetir a carga (ex.: pegar lançamentos novos): `ADMIN_EMAIL=... ADMIN_PASSWORD=... node tools/batch-import.js`
+Para repetir a carga (ex.: pegar lançamentos novos): `ADMIN_CODE=... node tools/batch-import.js`
 (`--dry` só mostra o que faria).
 
 ## Publicar na internet (Netlify + Render + Neon)
@@ -78,12 +76,12 @@ O frontend é estático (Netlify), mas o backend é Java e precisa de um host pr
 2. **Backend** — suba o repositório no GitHub e crie um *Web Service* no [Render](https://render.com) apontando
    para a pasta `backend` (Docker; o `render.yaml` já descreve). Envs:
    `JDBC_DATABASE_URL=jdbc:postgresql://HOST/DB?sslmode=require`, `DB_USER`, `DB_PASSWORD`,
-   `ALLOWED_ORIGINS=https://SEU-SITE.netlify.app`, `H2_CONSOLE=false` e, se quiser, `INVITE_CODE`.
+   `ALLOWED_ORIGINS=https://SEU-SITE.netlify.app`, `H2_CONSOLE=false` e `ADMIN_CODE` (código que libera o Estúdio).
    Anote a URL (ex.: `https://dramahub-api.onrender.com`).
 3. **Frontend** — no [Netlify](https://netlify.com), *Add new site → Import from Git*. O `netlify.toml` já configura
    build e publish; edite nele a linha `to = "https://SEU-BACKEND.onrender.com/api/:splat"` com a URL do Render.
    O Netlify faz proxy de `/api` → o app fica num domínio só (sem CORS, PWA instalável).
-4. Abra o site, crie a primeira conta (admin) e rode `API=https://SEU-SITE.netlify.app ADMIN_EMAIL=... ADMIN_PASSWORD=... node tools/batch-import.js`
+4. Rode `API=https://SEU-SITE.netlify.app ADMIN_CODE=... node tools/batch-import.js`
    para carregar o catálogo em produção.
 
 Avisos: no Render free o serviço dorme após 15 min sem uso (primeiro acesso demora ~1 min) e o disco é
@@ -125,9 +123,9 @@ POST   /api/series/{id}/episodes          multipart: number, title, file
 DELETE /api/series/{id} | /api/episodes/{id}
 GET    /api/stream/{episodeId}            vídeo enviado (suporta Range → seek)
 
-POST   /api/auth/register | /login           {name,email,password,avatar[,inviteCode]} -> {token,user}
-GET    /api/auth/me | /devices ; DELETE /api/auth/devices/{id} ; POST /api/auth/logout
-POST   /api/auth/claim                    {profile} migra dados de um perfil antigo
+POST   /api/auth/session                  cria a sessão anônima -> {token,user}
+GET    /api/auth/me ; PUT /api/auth/me {name,avatar} ; DELETE /api/auth/session
+POST   /api/auth/admin                    {code} libera o Estúdio nesta sessão
 
 (todas abaixo exigem Authorization: Bearer <token>)
 PUT    /api/me/progress/{episodeId}       {positionSec, completed}

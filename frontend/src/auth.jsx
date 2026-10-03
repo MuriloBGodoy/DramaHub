@@ -1,38 +1,41 @@
-import { createContext, useContext, useEffect, useState } from 'react'
+import { createContext, useCallback, useContext, useEffect, useState } from 'react'
 import { api, setToken, getToken } from './api'
 
 const AuthContext = createContext(null)
-const OLD_PROFILE_KEY = 'dramahub.profile'
+let inflight = null
 
+// Sem login: na primeira visita o navegador ganha uma sessão (token salvo no localStorage)
+// e o progresso/favoritos ficam nela.
 export function AuthProvider({ children }) {
-  const [user, setUser] = useState(undefined) // undefined = carregando, null = deslogado
+  const [user, setUser] = useState(undefined) // undefined = carregando, null = erro de conexão
 
-  useEffect(() => {
-    if (!getToken()) { setUser(null); return }
-    api.me().then(setUser).catch(() => { setToken(null); setUser(null) })
+  const start = useCallback(() => {
+    // uma só chamada por vez (o StrictMode roda o efeito duas vezes e criaria duas sessões)
+    inflight ||= (async () => {
+      try {
+        if (getToken()) {
+          try { setUser(await api.me()); return } catch { setToken(null) }
+        }
+        const s = await api.newSession()
+        setToken(s.token)
+        setUser(s.user)
+      } catch { setUser(null) } finally { inflight = null }
+    })()
+    return inflight
   }, [])
 
-  // Depois de entrar: se este navegador usava um perfil antigo (Julia/Murilo sem login),
-  // traz o progresso e os favoritos dele para a conta.
-  const finishLogin = async (session) => {
-    setToken(session.token)
-    setUser(session.user)
-    try {
-      const old = localStorage.getItem(OLD_PROFILE_KEY)
-      if (old) { await api.claimProfile(old); localStorage.removeItem(OLD_PROFILE_KEY) }
-    } catch { /* sem perfil antigo */ }
-  }
+  useEffect(() => { start() }, [start])
 
-  const login = (email, password) => api.login({ email, password }).then(finishLogin)
-  const register = (data) => api.register(data).then(finishLogin)
-  const logout = async () => {
-    try { await api.logout() } catch { /* token ja invalido */ }
+  // Apaga a sessão deste navegador e começa outra do zero.
+  const reset = async () => {
+    try { await api.endSession() } catch { /* token ja invalido */ }
     setToken(null)
-    setUser(null)
+    setUser(undefined)
+    await start()
   }
 
   return (
-    <AuthContext.Provider value={{ user, setUser, login, register, logout, isAdmin: user?.role === 'ADMIN' }}>
+    <AuthContext.Provider value={{ user, setUser, start, reset, isAdmin: user?.role === 'ADMIN' }}>
       {children}
     </AuthContext.Provider>
   )

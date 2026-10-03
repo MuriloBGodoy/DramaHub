@@ -4,7 +4,7 @@ import jakarta.persistence.*;
 
 import java.time.Instant;
 
-/** Sessao de um dispositivo. O token (aleatorio) e guardado apenas como hash SHA-256. */
+/** Sessao de um navegador. O token (aleatorio) e guardado apenas como hash SHA-256. */
 @Entity
 @Table(name = "device", indexes = @Index(columnList = "tokenHash", unique = true))
 public class Device {

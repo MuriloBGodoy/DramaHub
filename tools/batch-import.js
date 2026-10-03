@@ -1,6 +1,6 @@
 // Bateria de importacao: le os uploads dos canais oficiais via a API do DramaHub,
 // filtra dramas completos em portugues e importa por genero.
-// Uso: ADMIN_EMAIL=... ADMIN_PASSWORD=... node tools/batch-import.js [--dry]   (API=https://... para producao)
+// Uso: [ADMIN_CODE=...] node tools/batch-import.js [--dry]   (API=https://... para producao)
 const API = process.env.API || 'http://localhost:8080'
 let TOKEN = ''
 const DRY = process.argv.includes('--dry')
@@ -50,10 +50,11 @@ async function get(u) { const r = await fetch(u, { headers: auth() }); const j =
 async function post(u, body) { const r = await fetch(u, { method: 'POST', headers: { 'Content-Type': 'application/json', ...auth() }, body: JSON.stringify(body) }); const j = await r.json(); if (!r.ok) throw new Error(j.error || r.status); return j }
 
 (async () => {
-  if (!process.env.ADMIN_EMAIL) throw new Error('Defina ADMIN_EMAIL e ADMIN_PASSWORD (conta administradora)')
-  const login = await fetch(`${API}/api/auth/login`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email: process.env.ADMIN_EMAIL, password: process.env.ADMIN_PASSWORD, deviceName: 'batch-import' }) }).then((r) => r.json())
-  if (!login.token) throw new Error(login.error || 'login falhou')
-  TOKEN = login.token
+  const session = await fetch(`${API}/api/auth/session`, { method: 'POST' }).then((r) => r.json())
+  if (!session.token) throw new Error(session.error || 'nao foi possivel criar a sessao')
+  TOKEN = session.token
+  // sem ADMIN_CODE no servidor qualquer sessao ja e admin
+  if (session.user.role !== 'ADMIN') await post(`${API}/api/auth/admin`, { code: process.env.ADMIN_CODE || '' })
   const summary = []
   for (const src of SOURCES.filter((x) => !ONLY || (ONLY === 'ai' ? x.source === 'ai' : x.source !== 'ai'))) {
     console.log(`\n===== ${src.name}`)

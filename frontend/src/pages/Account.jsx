@@ -7,14 +7,11 @@ import { StudioIcon } from '../components/Icons'
 const AVATARS = ['💖', '🎬', '🍿', '🌸', '🔥', '👑', '🐺', '🦋', '🌙', '⭐', '🐉', '🎀']
 
 export default function Account() {
-  const { user, setUser, logout, isAdmin } = useAuth()
-  const [devices, setDevices] = useState([])
-  const [form, setForm] = useState({ name: user.name, avatar: user.avatar, currentPassword: '', newPassword: '' })
+  const { user, setUser, reset, isAdmin } = useAuth()
+  const [form, setForm] = useState({ name: user.name, avatar: user.avatar })
+  const [code, setCode] = useState('')
   const [msg, setMsg] = useState(null)
   const [installEvt, setInstallEvt] = useState(null)
-
-  const loadDevices = () => api.devices().then(setDevices).catch(() => {})
-  useEffect(() => { loadDevices() }, [])
 
   // Prompt de instalacao do PWA (Android/Chrome/Edge)
   useEffect(() => {
@@ -27,20 +24,25 @@ export default function Account() {
     e.preventDefault()
     setMsg(null)
     try {
-      const u = await api.updateMe(form)
-      setUser(u)
-      setForm({ ...form, currentPassword: '', newPassword: '' })
+      setUser(await api.updateMe(form))
       setMsg({ type: 'ok', text: 'Salvo!' })
     } catch (err) { setMsg({ type: 'err', text: err.message }) }
   }
 
-  const revoke = async (d) => {
-    if (!confirm(`Desconectar "${d.name}"?`)) return
-    await api.revokeDevice(d.id)
-    loadDevices()
+  const unlock = async (e) => {
+    e.preventDefault()
+    setMsg(null)
+    try {
+      setUser(await api.unlockAdmin(code))
+      setCode('')
+      setMsg({ type: 'ok', text: 'Estúdio liberado neste navegador.' })
+    } catch (err) { setMsg({ type: 'err', text: err.message }) }
   }
 
-  const fmt = (iso) => new Date(iso).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })
+  const restart = () => {
+    if (confirm('Começar do zero? O progresso e os favoritos deste navegador serão apagados.')) reset()
+  }
+
   const isIos = /iPhone|iPad/.test(navigator.userAgent)
   const standalone = window.matchMedia('(display-mode: standalone)').matches || navigator.standalone
 
@@ -52,7 +54,7 @@ export default function Account() {
         <div className="avatar big">{user.avatar}</div>
         <div>
           <b>{user.name}</b>
-          <div className="card-sub">{user.email} · {isAdmin ? 'administrador' : 'membro'}</div>
+          <div className="card-sub">salvo neste navegador{isAdmin ? ' · administrador' : ''}</div>
         </div>
       </div>
 
@@ -83,28 +85,27 @@ export default function Account() {
             <button type="button" key={a} className={form.avatar === a ? 'active' : ''} onClick={() => setForm({ ...form, avatar: a })}>{a}</button>
           ))}
         </div>
-        <div className="two">
-          <label>Senha atual<input type="password" autoComplete="current-password" value={form.currentPassword} onChange={(e) => setForm({ ...form, currentPassword: e.target.value })} placeholder="só pra trocar a senha" /></label>
-          <label>Nova senha<input type="password" autoComplete="new-password" value={form.newPassword} onChange={(e) => setForm({ ...form, newPassword: e.target.value })} /></label>
-        </div>
         <button className="btn">Salvar</button>
       </form>
 
+      {!isAdmin && (
+        <form className="form" onSubmit={unlock}>
+          <h3>Estúdio</h3>
+          <p className="card-sub" style={{ margin: 0 }}>Para gerenciar o catálogo, digite o código de administrador.</p>
+          <label>Código<input type="password" value={code} onChange={(e) => setCode(e.target.value)} /></label>
+          <button className="btn">Liberar</button>
+        </form>
+      )}
+
       <div className="form">
-        <h3>Dispositivos conectados</h3>
-        <p className="card-sub" style={{ margin: 0 }}>Seu progresso e favoritos ficam na conta — entre em qualquer aparelho e continue de onde parou.</p>
-        {devices.map((d) => (
-          <div key={d.id} className="device">
-            <div>
-              <b>{d.name}</b>{d.current && <span className="tag" style={{ marginLeft: 8 }}>este</span>}
-              <div className="card-sub">conectado em {fmt(d.createdAt)} · último uso {fmt(d.lastSeenAt)}</div>
-            </div>
-            {!d.current && <button className="link-danger" onClick={() => revoke(d)}>Desconectar</button>}
-          </div>
-        ))}
+        <h3>Sessão</h3>
+        <p className="card-sub" style={{ margin: 0 }}>
+          Não tem login: seu progresso e seus favoritos ficam guardados neste navegador. Em outro aparelho
+          (ou se limpar os dados do navegador) começa uma sessão nova.
+        </p>
       </div>
 
-      <button className="ghost wide" onClick={logout}>Sair deste dispositivo</button>
+      <button className="ghost wide" onClick={restart}>Começar do zero</button>
     </div>
   )
 }

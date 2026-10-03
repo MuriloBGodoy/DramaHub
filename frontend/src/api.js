@@ -19,7 +19,7 @@ async function request(path, options = {}) {
   if (res.status === 204) return null
   const data = await res.json().catch(() => null)
   if (!res.ok) {
-    if (res.status === 401 && token) { setToken(null); window.dispatchEvent(new Event('dramahub:logout')) }
+    if (res.status === 401 && token) { setToken(null); window.dispatchEvent(new Event('dramahub:session-lost')) }
     throw new Error(data?.error || `Erro ${res.status}`)
   }
   return data
@@ -28,16 +28,13 @@ async function request(path, options = {}) {
 const json = (body) => JSON.stringify(body)
 
 export const api = {
-  // conta
+  // sessão (sem login)
   authStatus: () => request('/api/auth/status'),
-  register: (body) => request('/api/auth/register', { method: 'POST', body: json(body) }),
-  login: (body) => request('/api/auth/login', { method: 'POST', body: json(body) }),
-  logout: () => request('/api/auth/logout', { method: 'POST' }),
+  newSession: () => request('/api/auth/session', { method: 'POST' }),
+  endSession: () => request('/api/auth/session', { method: 'DELETE' }),
   me: () => request('/api/auth/me'),
   updateMe: (body) => request('/api/auth/me', { method: 'PUT', body: json(body) }),
-  devices: () => request('/api/auth/devices'),
-  revokeDevice: (id) => request(`/api/auth/devices/${id}`, { method: 'DELETE' }),
-  claimProfile: (profile) => request('/api/auth/claim', { method: 'POST', body: json({ profile }) }),
+  unlockAdmin: (code) => request('/api/auth/admin', { method: 'POST', body: json({ code }) }),
 
   // catálogo
   series: (params = {}) => {

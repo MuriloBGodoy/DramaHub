@@ -12,20 +12,20 @@ import org.springframework.web.filter.OncePerRequestFilter;
 
 import java.io.IOException;
 import java.util.Optional;
-import java.util.Set;
 
 /**
  * Regras de acesso da API:
- *  - /api/auth/login, /api/auth/register: publicos
- *  - todo o resto de /api: exige token de dispositivo (Authorization: Bearer ... ou ?t=... para o <video>)
- *  - escrita no catalogo (POST/PUT/DELETE em /api/series, /api/episodes, /api/import): so ADMIN
+ *  - GET /api/auth/status e POST /api/auth/session (cria a sessao anonima): publicos
+ *  - todo o resto de /api: exige o token da sessao (Authorization: Bearer ... ou ?t=... para o <video>)
+ *  - escrita no catalogo (POST/PUT/DELETE em /api/series, /api/episodes, /api/import, /api/ai): so admin
+ *    (sessao liberada com ADMIN_CODE, ou qualquer sessao se ADMIN_CODE estiver vazio)
  * Fora de /api (frontend estatico) passa direto.
  */
 @Component
 public class AuthFilter extends OncePerRequestFilter {
 
     public static final String USER_ATTR = "dramahub.user";
-    private static final Set<String> PUBLIC = Set.of("/api/auth/login", "/api/auth/register", "/api/auth/status");
+    public static final String DEVICE_ATTR = "dramahub.device";
 
     private final AuthService auth;
 
@@ -37,7 +37,8 @@ public class AuthFilter extends OncePerRequestFilter {
     protected void doFilterInternal(HttpServletRequest req, HttpServletResponse res, FilterChain chain)
             throws ServletException, IOException {
         String path = req.getRequestURI();
-        if (!path.startsWith("/api/") || PUBLIC.contains(path) || "OPTIONS".equals(req.getMethod())) {
+        boolean isPublic = path.equals("/api/auth/status") || (path.equals("/api/auth/session") && "POST".equals(req.getMethod()));
+        if (!path.startsWith("/api/") || isPublic || "OPTIONS".equals(req.getMethod())) {
             chain.doFilter(req, res);
             return;
         }
@@ -49,7 +50,7 @@ public class AuthFilter extends OncePerRequestFilter {
 
         Optional<Device> device = auth.authenticate(token);
         if (device.isEmpty()) {
-            deny(res, 401, "Faça login para continuar");
+            deny(res, 401, "Sessão expirada");
             return;
         }
         User user = device.get().getUser();
@@ -58,13 +59,13 @@ public class AuthFilter extends OncePerRequestFilter {
         boolean write = !"GET".equals(req.getMethod()) && !"HEAD".equals(req.getMethod());
         boolean catalog = path.startsWith("/api/series") || path.startsWith("/api/episodes") || path.startsWith("/api/import")
                 || path.startsWith("/api/ai");
-        if (write && catalog && user.getRole() != User.Role.ADMIN) {
+        if (write && catalog && !auth.isAdmin(user)) {
             deny(res, 403, "Só o administrador pode alterar o catálogo");
             return;
         }
 
         req.setAttribute(USER_ATTR, user);
-        req.setAttribute("dramahub.device", device.get());
+        req.setAttribute(DEVICE_ATTR, device.get());
         chain.doFilter(req, res);
     }
 
