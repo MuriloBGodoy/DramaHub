@@ -60,7 +60,7 @@ export default function ScriptWriter({ onDone }) {
 
       {enabled === false && (
         <div className="notice err">
-          Desativado: defina a variável de ambiente <code>ANTHROPIC_API_KEY</code> (chave em console.anthropic.com) e reinicie o servidor.
+          Desativado: falta a chave da Anthropic. Rode <code>supabase secrets set ANTHROPIC_API_KEY=sk-ant-...</code> (chave em console.anthropic.com).
         </div>
       )}
 

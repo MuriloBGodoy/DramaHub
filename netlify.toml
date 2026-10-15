@@ -1,20 +1,14 @@
-# Frontend no Netlify. O backend Java roda em outro host (ex.: Render) e o Netlify
-# faz proxy de /api para ele — assim o app fica no mesmo dominio (sem CORS, PWA feliz).
+# Site estatico no Netlify; dados e login anonimo no Supabase (sem backend proprio).
 [build]
   base    = "frontend"
   command = "npm ci && npm run build"
   publish = "dist"
 
 [build.environment]
-  VITE_OUT_DIR = "dist"
   NODE_VERSION = "22"
-
-# Troque pela URL do seu backend
-[[redirects]]
-  from   = "/api/*"
-  to     = "https://SEU-BACKEND.onrender.com/api/:splat"
-  status = 200
-  force  = true
+  # Chave publicavel: pode ficar no repositorio (o acesso e controlado pelas regras RLS do banco)
+  VITE_SUPABASE_URL = "https://yixsqflqdztmrxlticpk.supabase.co"
+  VITE_SUPABASE_PUBLISHABLE_KEY = "sb_publishable_pjzuZTMMwtgMXndTH9KP_Q_y_Q78RdF"
 
 # SPA: qualquer rota vai para o index.html
 [[redirects]]

@@ -28,12 +28,11 @@ export default defineConfig({
       workbox: {
         // inclui a fonte Geist (woff2) no precache para o app abrir offline com a tipografia certa
         globPatterns: ['**/*.{js,css,html,svg,png,woff2}'],
-        // app shell em cache; API com rede primeiro (e cache de reserva para abrir offline)
+        // app shell em cache; catalogo do Supabase com rede primeiro (e cache de reserva para abrir offline)
         navigateFallback: '/index.html',
-        navigateFallbackDenylist: [/^\/api\//, /^\/h2/],
         runtimeCaching: [
           {
-            urlPattern: ({ url }) => url.pathname.startsWith('/api/series') || url.pathname.startsWith('/api/genres') || url.pathname === '/api/feed',
+            urlPattern: ({ url }) => url.hostname.endsWith('.supabase.co') && /^\/rest\/v1\/(series|episode|genres)\b/.test(url.pathname),
             handler: 'NetworkFirst',
             options: { cacheName: 'api-catalog', networkTimeoutSeconds: 5, expiration: { maxEntries: 200, maxAgeSeconds: 7 * 24 * 3600 } },
           },
@@ -49,17 +48,5 @@ export default defineConfig({
   server: {
     host: true, // permite abrir no celular pela rede local
     port: 5173,
-    proxy: {
-      // em dev, /api vai para o backend Spring Boot
-      '/api': {
-        target: 'http://localhost:8080',
-        changeOrigin: true,
-      },
-    },
-  },
-  build: {
-    // build final vai direto para o backend servir (java -jar); no Netlify use VITE_OUT_DIR=dist
-    outDir: process.env.VITE_OUT_DIR || '../backend/src/main/resources/static',
-    emptyOutDir: true,
   },
 })

@@ -1,19 +1,17 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { api, uploadEpisode } from '../api'
+import { api } from '../api'
 import { SparkIcon } from '../components/Icons'
 import YouTubeImport from '../components/YouTubeImport'
 import ScriptWriter from '../components/ScriptWriter'
 
 const emptySeries = { title: '', synopsis: '', coverUrl: '', genre: 'Romance', tags: '', credit: '', featured: false, source: 'ai' }
-const emptyEp = { seriesId: '', number: 1, title: '', videoUrl: '', thumbnailUrl: '', mode: 'file' }
+const emptyEp = { seriesId: '', number: 1, title: '', videoUrl: '', thumbnailUrl: '' }
 
 export default function Studio() {
   const [list, setList] = useState([])
   const [sForm, setSForm] = useState(emptySeries)
   const [eForm, setEForm] = useState(emptyEp)
-  const [file, setFile] = useState(null)
-  const [progress, setProgress] = useState(null)
   const [msg, setMsg] = useState(null)
   const [busy, setBusy] = useState(false)
 
@@ -40,19 +38,12 @@ export default function Studio() {
     setBusy(true)
     try {
       const fields = { number: eForm.number, title: eForm.title, thumbnailUrl: eForm.thumbnailUrl }
-      if (eForm.mode === 'file') {
-        if (!file) throw new Error('Selecione o arquivo de vídeo')
-        setProgress(0)
-        await uploadEpisode(eForm.seriesId, fields, file, setProgress)
-      } else {
-        if (!eForm.videoUrl) throw new Error('Informe a URL do vídeo')
-        await api.addEpisodeByUrl(eForm.seriesId, { ...fields, videoUrl: eForm.videoUrl })
-      }
+      if (!eForm.videoUrl) throw new Error('Informe a URL do vídeo')
+      await api.addEpisodeByUrl(eForm.seriesId, { ...fields, videoUrl: eForm.videoUrl })
       flash('ok', `Episódio ${eForm.number} adicionado!`)
       setEForm((f) => ({ ...f, number: Number(f.number) + 1, title: '', videoUrl: '', thumbnailUrl: '' }))
-      setFile(null)
       reload()
-    } catch (err) { flash('err', err.message) } finally { setBusy(false); setProgress(null) }
+    } catch (err) { flash('err', err.message) } finally { setBusy(false) }
   }
 
   const removeSeries = async (s) => {
@@ -76,7 +67,8 @@ export default function Studio() {
 
       <div className="notice info" style={{ marginBottom: 16 }}>
         <b><SparkIcon /> Como funciona:</b> gere os vídeos dos episódios em uma ferramenta de IA
-        (Kling, Runway, Veo, Sora, Pika...), crie a série aqui e envie cada episódio como arquivo (mp4/webm).
+        (Kling, Runway, Veo, Sora, Pika...), hospede o mp4 (ex: Supabase Storage, archive.org), crie a série aqui
+        e adicione cada episódio pela URL do vídeo.
         Vídeos verticais 9:16 de 1 a 3 minutos ficam perfeitos no player.
       </div>
 
@@ -125,24 +117,8 @@ export default function Studio() {
           <label>Número *<input type="number" min="1" required value={eForm.number} onChange={ef('number')} /></label>
           <label>Título<input value={eForm.title} onChange={ef('title')} placeholder="Ex: O Contrato" /></label>
         </div>
-        <label>Fonte do vídeo
-          <select value={eForm.mode} onChange={ef('mode')}>
-            <option value="file">Enviar arquivo (recomendado)</option>
-            <option value="url">URL externa (mp4)</option>
-          </select>
-        </label>
-        {eForm.mode === 'file' ? (
-          <label>Arquivo de vídeo *<input type="file" accept="video/mp4,video/webm,video/quicktime" onChange={(e) => setFile(e.target.files[0] || null)} /></label>
-        ) : (
-          <label>URL do vídeo *<input value={eForm.videoUrl} onChange={ef('videoUrl')} placeholder="https://.../episodio1.mp4" /></label>
-        )}
+        <label>URL do vídeo (mp4) *<input value={eForm.videoUrl} onChange={ef('videoUrl')} placeholder="https://.../episodio1.mp4" /></label>
         <label>URL da miniatura (opcional)<input value={eForm.thumbnailUrl} onChange={ef('thumbnailUrl')} placeholder="https://..." /></label>
-        {progress !== null && (
-          <div>
-            <div className="upload-bar"><i style={{ width: `${progress}%` }} /></div>
-            <div className="card-sub" style={{ marginTop: 6 }}>Enviando... {progress}%</div>
-          </div>
-        )}
         <button className="btn btn-primary" disabled={busy}>Adicionar episódio</button>
       </form>
 

@@ -1,4 +1,3 @@
-import { useEffect } from 'react'
 import { BrowserRouter, Navigate, Route, Routes, useLocation } from 'react-router-dom'
 import { AuthProvider, useAuth } from './auth'
 import Nav from './components/Nav'
@@ -14,13 +13,6 @@ import Account from './pages/Account'
 function Shell() {
   const { user, isAdmin, start } = useAuth()
   const { pathname } = useLocation()
-
-  // sessão apagada no servidor -> cria outra
-  useEffect(() => {
-    const h = () => start()
-    window.addEventListener('dramahub:session-lost', h)
-    return () => window.removeEventListener('dramahub:session-lost', h)
-  }, [start])
 
   if (user === undefined) return <div className="splash"><div className="brand">DramaHub</div></div>
   if (!user) {

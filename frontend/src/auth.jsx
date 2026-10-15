@@ -1,11 +1,11 @@
 import { createContext, useCallback, useContext, useEffect, useState } from 'react'
-import { api, setToken, getToken } from './api'
+import { api, supabase } from './api'
 
 const AuthContext = createContext(null)
 let inflight = null
 
-// Sem login: na primeira visita o navegador ganha uma sessão (token salvo no localStorage)
-// e o progresso/favoritos ficam nela.
+// Sem login: na primeira visita o navegador entra como usuário anônimo do Supabase
+// (sessão salva no localStorage) e o progresso/favoritos ficam nele.
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(undefined) // undefined = carregando, null = erro de conexão
 
@@ -13,12 +13,11 @@ export function AuthProvider({ children }) {
     // uma só chamada por vez (o StrictMode roda o efeito duas vezes e criaria duas sessões)
     inflight ||= (async () => {
       try {
-        if (getToken()) {
-          try { setUser(await api.me()); return } catch { setToken(null) }
+        const { data } = await supabase.auth.getSession()
+        if (data.session) {
+          try { setUser(await api.me()); return } catch { await supabase.auth.signOut({ scope: 'local' }) }
         }
-        const s = await api.newSession()
-        setToken(s.token)
-        setUser(s.user)
+        setUser((await api.newSession()).user)
       } catch { setUser(null) } finally { inflight = null }
     })()
     return inflight
@@ -28,8 +27,7 @@ export function AuthProvider({ children }) {
 
   // Apaga a sessão deste navegador e começa outra do zero.
   const reset = async () => {
-    try { await api.endSession() } catch { /* token ja invalido */ }
-    setToken(null)
+    try { await api.endSession() } catch { /* sessão já inválida */ }
     setUser(undefined)
     await start()
   }
