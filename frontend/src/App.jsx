@@ -9,6 +9,7 @@ import SeriesPage from './pages/SeriesPage'
 import Player from './pages/Player'
 import Studio from './pages/Studio'
 import Account from './pages/Account'
+import NewDramas from './components/NewDramas'
 
 function Shell() {
   const { user, isAdmin, start } = useAuth()
@@ -42,6 +43,7 @@ function Shell() {
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
       {!fullscreen && <Nav />}
+      {!fullscreen && <NewDramas />}
     </div>
   )
 }

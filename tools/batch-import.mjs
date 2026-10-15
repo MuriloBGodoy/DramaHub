@@ -23,8 +23,35 @@ const SOURCES = [
   { name: 'PoPo Drama Vício IA', playlist: 'UUEKmOYvoHzmfsp0My_FWciA', langCheck: false, source: 'ai' },
   { name: 'Next_Episode (Drama de IA)', playlist: 'UUg4bKWN64z2sV20ZR24vu6Q', langCheck: true, source: 'ai' },
   { name: 'DramaTales (IA)', playlist: 'UUiC5X3RSsFXqHJuaVc9ymUA', langCheck: true, source: 'ai' },
+
+  // ---- 2026-10: canais novos (marcados com novo: true; rode so eles com ONLY=novo) ----
+  // Canais que se declaram produtores de drama GERADO POR IA
+  { name: 'Velvet Romance (IA)', playlist: 'UUpizx5k3N-KfXV0Eihm0-NQ', langCheck: true, source: 'ai', novo: true },
+  { name: 'Unreal Hearts (IA)', playlist: 'UUj_kPtykol6IeijzehdUoZQ', langCheck: true, source: 'ai', novo: true },
+  { name: 'DramaLure (IA)', playlist: 'UUfpFahhyqs5caxVD9bUSVuQ', langCheck: true, source: 'ai', novo: true },
+  // Canais mistos: so os videos marcados como IA no titulo
+  { name: 'Drama Diary', playlist: 'UU8jpOC31Ks-Dr5BL_KKjR0Q', langCheck: true, source: 'ai', aiOnly: true, novo: true },
+  { name: 'Cineminha do Destino', playlist: 'UUd690sjJFCcVDkOZByHNPoA', langCheck: true, source: 'ai', aiOnly: true, novo: true },
+  { name: 'HotMinissérie', playlist: 'UUVeHRoBtfvtc0IqqNIvt2Nw', langCheck: true, source: 'ai', aiOnly: true, novo: true },
+  { name: 'Drama da Lua', playlist: 'UU07XAIvhFK4jaO8yowAJs2A', langCheck: true, source: 'ai', aiOnly: true, novo: true },
+  { name: 'Puro Frio na Barriga', playlist: 'UUnMW7LyoeD7N1btRPrrrCIw', langCheck: true, source: 'ai', aiOnly: true, novo: true },
+  // Canais oficiais de apps / conteudo declarado como licenciado (sem hashtags de outras plataformas)
+  { name: 'KalosTV PT (oficial)', playlist: 'UU2BeNC4vTu7zWQfaAjimCYw', langCheck: true, novo: true },
+  { name: 'FlexTV · CineFesta (oficial)', playlist: 'UU5MFT4piu-8q1tnTUgLSq6g', langCheck: true, novo: true },
+  { name: 'LoveReel PT (oficial)', playlist: 'UUiG8GrCaPpZUTE6HlLzQVvg', langCheck: true, novo: true },
+  { name: 'StardustTV (oficial)', playlist: 'UUHaddPbDDW8KMXLBR7yu80Q', langCheck: true, novo: true },
+  { name: 'Clube de Skit Viciado', playlist: 'UUsDK_Ra9Ko-Shz1eLYxG_lQ', langCheck: true, novo: true },
+  { name: 'Teatro Romântico (licenciado)', playlist: 'UUsTVaApBDR8H0NAEc-0Fusw', langCheck: true, novo: true },
+  { name: 'Minicinema BR (licenciado)', playlist: 'UUY2rcPMArM3uQt92hY3LFCQ', langCheck: true, novo: true },
+  { name: 'Vibra Amor (autorizado)', playlist: 'UUwjXlDvX-jUTOZhaqiSfjOg', langCheck: true, novo: true },
+  { name: 'Alpha Supremo Drama (licenciado)', playlist: 'UUkKZD3iSx3o2kDpBwSz4lFg', langCheck: true, novo: true },
+  { name: 'Lunar Tales (licenciado)', playlist: 'UUPbd5sF0KBpWF_MrurId-Rg', langCheck: true, novo: true },
+  { name: 'Yuewen Drama Português', playlist: 'UUM_AZ-Eg0u8qRad651PFUQQ', langCheck: true, novo: true },
+  { name: 'Aven TV Português', playlist: 'UUC42Bf61MVkrZMsrTj_R_UA', langCheck: true, novo: true },
 ]
 const MIN_SEC = 40 * 60
+// marcacao explicita de video feito com IA ("ia" solto e o verbo ir; "sobre IA" e tema, nao origem)
+const AI_TITLE = /#(ia|ai|aidrama|aivideo|aishorts|aimovie|aiart)\b|(criad|gerad|feit)[oa]s? (por|com) (a )?IA|drama de IA|【[^】]*\b(IA|AI)\b[^】]*】|[[(](IA|AI)[\])]/i
 const EXCLUDE = /\b(parte|part)\s*\d|\bep\.?\s*\d|epis[oó]dio\s*\d|cap[ií]tulo\s*\d|trailer|teaser|\b(1|2|3)\/\d\b|\[(1|2|3)\]/i
 
 // Heuristica de idioma para o canal LatAm (mistura espanhol e portugues)
@@ -81,12 +108,21 @@ async function importVideos(p, req) {
 (async () => {
   if (!KEY) throw new Error('SUPABASE_SECRET_KEY nao esta no .env da raiz')
   const summary = []
-  for (const src of SOURCES.filter((x) => !ONLY || (ONLY === 'ai' ? x.source === 'ai' : x.source !== 'ai'))) {
+  const pick = (x) => !ONLY || (ONLY === 'novo' ? x.novo : ONLY === 'mix' ? x.aiOnly : ONLY === 'ai' ? x.source === 'ai' : x.source !== 'ai')
+  for (const src of SOURCES.filter(pick)) {
     console.log(`\n===== ${src.name}`)
-    const p = await preview('https://www.youtube.com/playlist?list=' + src.playlist)
+    let p
+    for (let tentativa = 1; !p; tentativa++) {
+      try { p = await preview('https://www.youtube.com/playlist?list=' + src.playlist) } catch (e) {
+        console.log(`   falhou (${e.message})${tentativa < 3 ? ', tentando de novo' : ', pulando o canal'}`)
+        if (tentativa >= 3) break
+        await new Promise((r) => setTimeout(r, 10000))
+      }
+    }
+    if (!p) continue
     const all = p.videos
     const long = all.filter((v) => v.available && (v.durationSec || 0) >= MIN_SEC)
-    const complete = long.filter((v) => !EXCLUDE.test(v.title))
+    const complete = long.filter((v) => !EXCLUDE.test(v.title) && (!src.aiOnly || AI_TITLE.test(v.title)))
     const pt = src.langCheck ? complete.filter((v) => isPortuguese(v.title)) : complete
     console.log(`videos: ${all.length} | >=40min: ${long.length} | completos: ${complete.length} | em português: ${pt.length}`)
     if (src.langCheck) complete.filter((v) => !isPortuguese(v.title)).slice(0, 5).forEach((v) => console.log('   [ES?] ' + v.title.slice(0, 80)))
@@ -101,7 +137,7 @@ async function importVideos(p, req) {
         url: 'https://www.youtube.com/playlist?list=' + src.playlist,
         mode: 'collection', genre, source: src.source || 'yt',
         tags: src.source === 'ai' ? 'ia, gerado por ia, drama completo' : 'dublado, drama completo',
-        credit: `YouTube · canal oficial ${src.name}`,
+        credit: `YouTube · canal ${src.name}`,
         episodes: vids.map((v) => ({ videoId: v.videoId })),
       })
       console.log(`     -> importadas ${r.created.length} séries (${r.skipped.length} puladas)`)

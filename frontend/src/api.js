@@ -121,6 +121,17 @@ export const api = {
     return rows.map((s) => toEpisode(s.episode[0], s))
   },
 
+  /** Data da série mais nova do catálogo (marca d'água dos "dramas novos"). */
+  latestSeriesAt: async () =>
+    check(await supabase.from('series').select('created_at').order('created_at', { ascending: false }).limit(1))[0]?.created_at ?? null,
+  /** Séries adicionadas depois de `since` (as de IA primeiro, depois as mais novas) e o total. */
+  newSeriesSince: async (since, limit = 6) => {
+    const { data, count, error } = await supabase.from('series').select(`${SERIES_COLS},episode(count)`, { count: 'exact' })
+      .gt('created_at', since).order('source', { ascending: true }).order('created_at', { ascending: false }).limit(limit)
+    if (error) throw new Error(error.message)
+    return { total: count ?? data.length, items: data.map((s) => ({ ...toSummary(s), createdAt: s.created_at })) }
+  },
+
   // ---------- meu progresso / favoritos ----------
   saveProgress: async (episodeId, positionSec, completed, keepalive = false) => {
     const row = {
