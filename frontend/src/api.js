@@ -39,7 +39,10 @@ const toProgress = (p) => ({
   positionSec: p.position_sec, completed: p.completed, episode: toEpisode(p.episode, p.episode.series),
 })
 
-const toUser = (p) => ({ id: p.id, name: p.name, avatar: p.avatar, role: p.is_admin ? 'ADMIN' : 'USER' })
+const toUser = (p, u) => ({
+  id: p.id, name: p.name, avatar: p.avatar, role: p.is_admin ? 'ADMIN' : 'USER',
+  email: u?.is_anonymous ? null : u?.email || null, // com e-mail = tem conta (entra em qualquer aparelho)
+})
 
 /** Lanca o erro do Supabase com mensagem legivel. */
 function check({ data, error }) {
@@ -61,7 +64,23 @@ async function all(build) {
 let current = null
 supabase.auth.onAuthStateChange((_e, session) => { current = session })
 
-const uid = async () => (await supabase.auth.getSession()).data.session?.user.id
+const authUser = async () => (await supabase.auth.getSession()).data.session?.user
+const uid = async () => (await authUser())?.id
+
+/** Erros do login em português. */
+function authCheck({ data, error }) {
+  if (!error) return data
+  const msg = {
+    email_exists: 'Esse e-mail já tem conta. Use "Já tenho conta".',
+    user_already_exists: 'Esse e-mail já tem conta. Use "Já tenho conta".',
+    invalid_credentials: 'E-mail ou senha incorretos.',
+    weak_password: 'Senha fraca: use pelo menos 6 caracteres.',
+    email_address_invalid: 'E-mail inválido.',
+    validation_failed: 'Confira o e-mail e a senha.',
+    over_request_rate_limit: 'Muitas tentativas. Espere um pouco e tente de novo.',
+  }[error.code]
+  throw new Error(msg || error.message || 'Erro de conexão')
+}
 
 /** Chama uma Edge Function e devolve o JSON (ou lanca a mensagem de erro dela). */
 async function invoke(name, body) {
@@ -76,7 +95,11 @@ async function invoke(name, body) {
 
 export const api = {
   // ---------- sessão (login anônimo do Supabase) ----------
-  me: async () => toUser(check(await supabase.from('profile').select('*').eq('id', await uid()).single())),
+  me: async () => {
+    const u = await authUser()
+    let p = check(await supabase.from('profile').select('*').eq('id', u.id).single())
+    return toUser(p, u)
+  },
   newSession: async () => {
     check(await supabase.auth.signInAnonymously())
     return { user: await api.me() }
@@ -86,8 +109,27 @@ export const api = {
     await supabase.auth.signOut({ scope: 'local' })
   },
   updateMe: async ({ name, avatar }) =>
-    toUser(check(await supabase.from('profile').update({ name: name?.trim() || 'Visitante', avatar }).eq('id', await uid()).select().single())),
-  unlockAdmin: async (code) => toUser(check(await supabase.rpc('unlock_admin', { code }))),
+    toUser(check(await supabase.from('profile').update({ name: name?.trim() || 'Visitante', avatar }).eq('id', await uid()).select().single()), await authUser()),
+  unlockAdmin: async (code) => toUser(check(await supabase.rpc('unlock_admin', { code })), await authUser()),
+  /** Transforma a sessão anônima em conta (mesmo usuário: progresso, favoritos e perfil continuam). */
+  createAccount: async (email, password) => {
+    authCheck(await supabase.auth.updateUser({ email: email.trim(), password }))
+    return api.me()
+  },
+  /** Entra numa conta que já existe; o visitante anônimo deste navegador é apagado. */
+  login: async (email, password) => {
+    const old = (await supabase.auth.getSession()).data.session
+    authCheck(await supabase.auth.signInWithPassword({ email: email.trim(), password }))
+    if (old?.user.is_anonymous) {
+      fetch(`${import.meta.env.VITE_SUPABASE_URL}/rest/v1/rpc/delete_me`, {
+        method: 'POST',
+        headers: { apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY, Authorization: `Bearer ${old.access_token}` },
+      }).catch(() => {})
+    }
+    return api.me()
+  },
+  /** Sai da conta; o AuthProvider cria uma sessão anônima nova. */
+  logout: () => supabase.auth.signOut({ scope: 'local' }),
 
   // ---------- catálogo ----------
   series: async ({ genre, source, q } = {}) => {

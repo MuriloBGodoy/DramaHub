@@ -4,8 +4,8 @@ import { api, supabase } from './api'
 const AuthContext = createContext(null)
 let inflight = null
 
-// Sem login: na primeira visita o navegador entra como usuário anônimo do Supabase
-// (sessão salva no localStorage) e o progresso/favoritos ficam nele.
+// Na primeira visita o navegador entra como usuário anônimo do Supabase (sessão salva no
+// localStorage) e o progresso/favoritos ficam nele. Criar conta (e-mail e senha) é opcional e leva tudo junto.
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(undefined) // undefined = carregando, null = erro de conexão
 
@@ -25,6 +25,16 @@ export function AuthProvider({ children }) {
 
   useEffect(() => { start() }, [start])
 
+  const createAccount = async (email, password) => setUser(await api.createAccount(email, password))
+  const login = async (email, password) => setUser(await api.login(email, password))
+
+  // Sai da conta e volta a ser um visitante anônimo neste navegador.
+  const logout = async () => {
+    await api.logout()
+    setUser(undefined)
+    await start()
+  }
+
   // Apaga a sessão deste navegador e começa outra do zero.
   const reset = async () => {
     try { await api.endSession() } catch { /* sessão já inválida */ }
@@ -33,7 +43,7 @@ export function AuthProvider({ children }) {
   }
 
   return (
-    <AuthContext.Provider value={{ user, setUser, start, reset, isAdmin: user?.role === 'ADMIN' }}>
+    <AuthContext.Provider value={{ user, setUser, start, reset, createAccount, login, logout, isAdmin: user?.role === 'ADMIN' }}>
       {children}
     </AuthContext.Provider>
   )

@@ -7,11 +7,12 @@ import { StudioIcon } from '../components/Icons'
 const AVATARS = ['💖', '🎬', '🍿', '🌸', '🔥', '👑', '🐺', '🦋', '🌙', '⭐', '🐉', '🎀']
 
 export default function Account() {
-  const { user, setUser, reset, isAdmin } = useAuth()
+  const { user, setUser, reset, createAccount, login, logout, isAdmin } = useAuth()
   const [form, setForm] = useState({ name: user.name, avatar: user.avatar })
   const [code, setCode] = useState('')
   const [msg, setMsg] = useState(null)
   const [installEvt, setInstallEvt] = useState(null)
+  const [acc, setAcc] = useState({ mode: 'criar', email: '', password: '', busy: false })
 
   // Prompt de instalacao do PWA (Android/Chrome/Edge)
   useEffect(() => {
@@ -39,6 +40,29 @@ export default function Account() {
     } catch (err) { setMsg({ type: 'err', text: err.message }) }
   }
 
+  const submitAccount = async (e) => {
+    e.preventDefault()
+    setMsg(null)
+    setAcc((a) => ({ ...a, busy: true }))
+    try {
+      if (acc.mode === 'criar') {
+        await createAccount(acc.email, acc.password)
+        setMsg({ type: 'ok', text: 'Conta criada! Agora é só entrar com esse e-mail e senha em qualquer aparelho.' })
+      } else {
+        await login(acc.email, acc.password)
+        setMsg({ type: 'ok', text: 'Pronto, você entrou na sua conta.' })
+      }
+      setAcc({ mode: 'criar', email: '', password: '', busy: false })
+    } catch (err) {
+      setMsg({ type: 'err', text: err.message })
+      setAcc((a) => ({ ...a, busy: false }))
+    }
+  }
+
+  const leave = () => {
+    if (confirm('Sair da conta neste aparelho? Seus dados continuam salvos na conta.')) logout()
+  }
+
   const restart = () => {
     if (confirm('Começar do zero? O progresso e os favoritos deste navegador serão apagados.')) reset()
   }
@@ -54,7 +78,7 @@ export default function Account() {
         <div className="avatar big">{user.avatar}</div>
         <div>
           <b>{user.name}</b>
-          <div className="card-sub">salvo neste navegador{isAdmin ? ' · administrador' : ''}</div>
+          <div className="card-sub">{user.email || 'salvo neste navegador'}{isAdmin ? ' · administrador' : ''}</div>
         </div>
       </div>
 
@@ -97,15 +121,35 @@ export default function Account() {
         </form>
       )}
 
-      <div className="form">
-        <h3>Sessão</h3>
-        <p className="card-sub" style={{ margin: 0 }}>
-          Não tem login: seu progresso e seus favoritos ficam guardados neste navegador. Em outro aparelho
-          (ou se limpar os dados do navegador) começa uma sessão nova.
-        </p>
-      </div>
+      {user.email ? (
+        <div className="form">
+          <h3>Conta</h3>
+          <p className="card-sub" style={{ margin: 0 }}>
+            Você está na conta <b>{user.email}</b>. Seu progresso, seus favoritos e seu perfil ficam salvos nela:
+            é só entrar com esse e-mail e senha em qualquer aparelho.
+          </p>
+          <button type="button" className="ghost" onClick={leave}>Sair da conta</button>
+        </div>
+      ) : (
+        <form className="form" onSubmit={submitAccount}>
+          <h3>Conta</h3>
+          <div className="chips" style={{ padding: 0 }}>
+            <button type="button" className={`chip ${acc.mode === 'criar' ? 'active' : ''}`} onClick={() => setAcc({ ...acc, mode: 'criar' })}>Criar conta</button>
+            <button type="button" className={`chip ${acc.mode === 'entrar' ? 'active' : ''}`} onClick={() => setAcc({ ...acc, mode: 'entrar' })}>Já tenho conta</button>
+          </div>
+          <p className="card-sub" style={{ margin: 0 }}>
+            {acc.mode === 'criar'
+              ? 'Hoje seu progresso e seus favoritos estão só neste navegador. Crie uma conta para guardar tudo e continuar de onde parou em qualquer aparelho.'
+              : 'Entre para ver o progresso e os favoritos da sua conta neste aparelho.'}
+          </p>
+          <label>E-mail<input type="email" autoComplete="email" required value={acc.email} onChange={(e) => setAcc({ ...acc, email: e.target.value })} /></label>
+          <label>Senha<input type="password" minLength={6} required autoComplete={acc.mode === 'criar' ? 'new-password' : 'current-password'}
+            value={acc.password} onChange={(e) => setAcc({ ...acc, password: e.target.value })} /></label>
+          <button className="btn" disabled={acc.busy}>{acc.mode === 'criar' ? 'Criar conta' : 'Entrar'}</button>
+        </form>
+      )}
 
-      <button className="ghost wide" onClick={restart}>Começar do zero</button>
+      {!user.email && <button className="ghost wide" onClick={restart}>Começar do zero</button>}
     </div>
   )
 }
