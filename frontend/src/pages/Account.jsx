@@ -2,9 +2,8 @@ import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { api } from '../api'
 import { useAuth } from '../auth'
+import Avatar, { AvatarPicker } from '../components/Avatar'
 import { StudioIcon } from '../components/Icons'
-
-const AVATARS = ['💖', '🎬', '🍿', '🌸', '🔥', '👑', '🐺', '🦋', '🌙', '⭐', '🐉', '🎀']
 
 export default function Account() {
   const { user, setUser, reset, createAccount, login, logout, isAdmin } = useAuth()
@@ -12,7 +11,10 @@ export default function Account() {
   const [code, setCode] = useState('')
   const [msg, setMsg] = useState(null)
   const [installEvt, setInstallEvt] = useState(null)
-  const [acc, setAcc] = useState({ mode: 'criar', email: '', password: '', busy: false })
+  const [acc, setAcc] = useState({ mode: 'criar', name: user.name === 'Visitante' ? '' : user.name, avatar: user.avatar, email: '', password: '', busy: false })
+
+  // trocou de usuário (entrou numa conta ou saiu): o formulário mostra o perfil dele
+  useEffect(() => { setForm({ name: user.name, avatar: user.avatar }) }, [user.id]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // Prompt de instalacao do PWA (Android/Chrome/Edge)
   useEffect(() => {
@@ -47,12 +49,15 @@ export default function Account() {
     try {
       if (acc.mode === 'criar') {
         await createAccount(acc.email, acc.password)
+        const me = await api.updateMe({ name: acc.name || user.name, avatar: acc.avatar })
+        setUser(me)
+        setForm({ name: me.name, avatar: me.avatar })
         setMsg({ type: 'ok', text: 'Conta criada! Agora é só entrar com esse e-mail e senha em qualquer aparelho.' })
       } else {
         await login(acc.email, acc.password)
         setMsg({ type: 'ok', text: 'Pronto, você entrou na sua conta.' })
       }
-      setAcc({ mode: 'criar', email: '', password: '', busy: false })
+      setAcc((a) => ({ ...a, email: '', password: '', busy: false }))
     } catch (err) {
       setMsg({ type: 'err', text: err.message })
       setAcc((a) => ({ ...a, busy: false }))
@@ -75,7 +80,7 @@ export default function Account() {
       <h1 className="page-title">Perfil</h1>
 
       <div className="account-head">
-        <div className="avatar big">{user.avatar}</div>
+        <Avatar value={user.avatar} big />
         <div>
           <b>{user.name}</b>
           <div className="card-sub">{user.email || 'salvo neste navegador'}{isAdmin ? ' · administrador' : ''}</div>
@@ -104,11 +109,7 @@ export default function Account() {
       <form className="form" onSubmit={save}>
         <h3>Perfil</h3>
         <label>Nome<input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} /></label>
-        <div className="avatar-pick">
-          {AVATARS.map((a) => (
-            <button type="button" key={a} className={form.avatar === a ? 'active' : ''} onClick={() => setForm({ ...form, avatar: a })}>{a}</button>
-          ))}
-        </div>
+        <AvatarPicker value={form.avatar} onChange={(avatar) => setForm({ ...form, avatar })} onError={(text) => setMsg({ type: 'err', text })} />
         <button className="btn">Salvar</button>
       </form>
 
@@ -142,6 +143,13 @@ export default function Account() {
               ? 'Hoje seu progresso e seus favoritos estão só neste navegador. Crie uma conta para guardar tudo e continuar de onde parou em qualquer aparelho.'
               : 'Entre para ver o progresso e os favoritos da sua conta neste aparelho.'}
           </p>
+          {acc.mode === 'criar' && (
+            <>
+              <label>Seu nome<input value={acc.name} placeholder="Como quer ser chamada(o)" onChange={(e) => setAcc({ ...acc, name: e.target.value })} /></label>
+              <div className="card-sub">Foto ou emoji</div>
+              <AvatarPicker value={acc.avatar} onChange={(avatar) => setAcc({ ...acc, avatar })} onError={(text) => setMsg({ type: 'err', text })} />
+            </>
+          )}
           <label>E-mail<input type="email" autoComplete="email" required value={acc.email} onChange={(e) => setAcc({ ...acc, email: e.target.value })} /></label>
           <label>Senha<input type="password" minLength={6} required autoComplete={acc.mode === 'criar' ? 'new-password' : 'current-password'}
             value={acc.password} onChange={(e) => setAcc({ ...acc, password: e.target.value })} /></label>

@@ -111,6 +111,23 @@ export const api = {
   updateMe: async ({ name, avatar }) =>
     toUser(check(await supabase.from('profile').update({ name: name?.trim() || 'Visitante', avatar }).eq('id', await uid()).select().single()), await authUser()),
   unlockAdmin: async (code) => toUser(check(await supabase.rpc('unlock_admin', { code })), await authUser()),
+  /**
+   * Envia uma foto de perfil (reduzida para 320px em JPEG) para o Storage e devolve a URL pública.
+   * Não salva no perfil: quem chama decide (o formulário salva junto com o nome).
+   */
+  uploadAvatar: async (file) => {
+    const id = await uid()
+    const bmp = await createImageBitmap(file)
+    const side = Math.min(bmp.width, bmp.height)
+    const canvas = Object.assign(document.createElement('canvas'), { width: 320, height: 320 })
+    // corte quadrado no centro
+    canvas.getContext('2d').drawImage(bmp, (bmp.width - side) / 2, (bmp.height - side) / 2, side, side, 0, 0, 320, 320)
+    const blob = await new Promise((ok) => canvas.toBlob(ok, 'image/jpeg', 0.85))
+    const path = `${id}/foto.jpg`
+    check(await supabase.storage.from('avatars').upload(path, blob, { upsert: true, contentType: 'image/jpeg' }))
+    // ?v= troca a URL a cada envio, senão o navegador mostra a foto antiga do cache
+    return `${supabase.storage.from('avatars').getPublicUrl(path).data.publicUrl}?v=${Date.now()}`
+  },
   /** Transforma a sessão anônima em conta (mesmo usuário: progresso, favoritos e perfil continuam). */
   createAccount: async (email, password) => {
     authCheck(await supabase.auth.updateUser({ email: email.trim(), password }))
@@ -166,12 +183,32 @@ export const api = {
   /** Data da série mais nova do catálogo (marca d'água dos "dramas novos"). */
   latestSeriesAt: async () =>
     check(await supabase.from('series').select('created_at').order('created_at', { ascending: false }).limit(1))[0]?.created_at ?? null,
-  /** Séries adicionadas depois de `since` (as de IA primeiro, depois as mais novas) e o total. */
-  newSeriesSince: async (since, limit = 6) => {
-    const { data, count, error } = await supabase.from('series').select(`${SERIES_COLS},episode(count)`, { count: 'exact' })
-      .gt('created_at', since).order('source', { ascending: true }).order('created_at', { ascending: false }).limit(limit)
+  /**
+   * Séries adicionadas depois de `since` (as de IA primeiro, depois as mais novas), o total e
+   * em quais seções da Início elas aparecem ("Feitos com IA" e as fileiras de gênero), com contagem.
+   */
+  newSeriesSince: async (since, limit = 10) => {
+    const [{ data, count, error }, where] = await Promise.all([
+      supabase.from('series').select(`${SERIES_COLS},episode(count)`, { count: 'exact' })
+        .gt('created_at', since).order('source', { ascending: true }).order('created_at', { ascending: false }).limit(limit),
+      supabase.from('series').select('source,genre').gt('created_at', since).limit(1000),
+    ])
     if (error) throw new Error(error.message)
-    return { total: count ?? data.length, items: data.map((s) => ({ ...toSummary(s), createdAt: s.created_at })) }
+    const sections = new Map()
+    const add = (key, label, to) => {
+      const s = sections.get(key) || { label, to, count: 0, ai: key === 'ai' }
+      s.count++
+      sections.set(key, s)
+    }
+    for (const s of where.data || []) {
+      if (s.source === 'ai') add('ai', 'Feitos com IA', '/buscar?source=ai')
+      if (s.genre) add(`g:${s.genre}`, s.genre, `/buscar?genre=${encodeURIComponent(s.genre)}`)
+    }
+    return {
+      total: count ?? data.length,
+      items: data.map((s) => ({ ...toSummary(s), createdAt: s.created_at })),
+      sections: [...sections.values()].sort((a, b) => b.ai - a.ai || b.count - a.count),
+    }
   },
 
   // ---------- meu progresso / favoritos ----------

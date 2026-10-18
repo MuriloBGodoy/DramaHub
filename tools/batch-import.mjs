@@ -48,6 +48,13 @@ const SOURCES = [
   { name: 'Lunar Tales (licenciado)', playlist: 'UUPbd5sF0KBpWF_MrurId-Rg', langCheck: true, novo: true },
   { name: 'Yuewen Drama Português', playlist: 'UUM_AZ-Eg0u8qRad651PFUQQ', langCheck: true, novo: true },
   { name: 'Aven TV Português', playlist: 'UUC42Bf61MVkrZMsrTj_R_UA', langCheck: true, novo: true },
+  // ---- 2026-10-18: lote 3, so IA (rode so eles com ONLY=lote3) ----
+  { name: 'Ying Mundo (IA)', playlist: 'UURO7-gd252ndmuxKhvYwuAw', langCheck: true, source: 'ai', lote: 3 },
+  { name: 'Flash Drama Club (IA)', playlist: 'UUacewq8yT5H0dXyuH4UsolQ', langCheck: true, source: 'ai', lote: 3 },
+  { name: 'Epic AI Films', playlist: 'UU5FCyk1QkTBLgWm-w866PGg', langCheck: true, source: 'ai', lote: 3 },
+  { name: 'Paris AI Drama', playlist: 'UUcUkHaYPJ1XUs3IUKx0oQRw', langCheck: true, source: 'ai', lote: 3 },
+  { name: 'RM Digital Filmes (IA)', playlist: 'UUDeAC8W9vGhsYgQ5tOtn7Xw', langCheck: true, source: 'ai', lote: 3 },
+  { name: 'DramaWave (oficial)', playlist: 'UUMHj3JqQ8nRWZZbTRNKT6-g', langCheck: true, source: 'ai', aiOnly: true, lote: 3 },
 ]
 const MIN_SEC = 40 * 60
 // marcacao explicita de video feito com IA ("ia" solto e o verbo ir; "sobre IA" e tema, nao origem)
@@ -95,20 +102,38 @@ async function existingIds() {
   }
 }
 
+/** Titulo normalizado: canais repostam o mesmo drama (dublado/legendado) com outro video. */
+const titleKey = (t) => t.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^a-z0-9]+/g, ' ').trim()
+
+async function existingTitles() {
+  const keys = new Set()
+  for (let from = 0; ; from += 1000) {
+    const rows = await rest('series?select=title', { headers: { Range: `${from}-${from + 999}` } })
+    rows.forEach((r) => keys.add(titleKey(r.title)))
+    if (rows.length < 1000) return keys
+  }
+}
+
 /** Mesmo fluxo da Edge Function youtube-import, mas com a chave secreta. */
 async function importVideos(p, req) {
   const plan = planImport(p, req, await existingIds())
+  const titles = await existingTitles()
+  const created = []
   for (let i = 0; i < plan.series.length; i++) {
+    const key = titleKey(plan.series[i].title)
+    if (titles.has(key)) { plan.skipped.push(plan.series[i].title); continue }
+    titles.add(key)
     const [s] = await rest('series', { method: 'POST', body: JSON.stringify(plan.series[i]) })
     await rest('episode', { method: 'POST', body: JSON.stringify(plan.episodes[i].map((e) => ({ ...e, series_id: s.id }))) })
+    created.push(s)
   }
-  return { created: plan.series, skipped: plan.skipped }
+  return { created, skipped: plan.skipped }
 }
 
 (async () => {
   if (!KEY) throw new Error('SUPABASE_SECRET_KEY nao esta no .env da raiz')
   const summary = []
-  const pick = (x) => !ONLY || (ONLY === 'novo' ? x.novo : ONLY === 'mix' ? x.aiOnly : ONLY === 'ai' ? x.source === 'ai' : x.source !== 'ai')
+  const pick = (x) => !ONLY || (ONLY === 'novo' ? x.novo : ONLY === 'lote3' ? x.lote === 3 : ONLY === 'mix' ? x.aiOnly : ONLY === 'ai' ? x.source === 'ai' : x.source !== 'ai')
   for (const src of SOURCES.filter(pick)) {
     console.log(`\n===== ${src.name}`)
     let p

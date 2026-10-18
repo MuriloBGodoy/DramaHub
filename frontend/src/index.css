@@ -390,6 +390,9 @@ img.lb { transform: scale(1.34); } /* esconde as faixas pretas do hqdefault 4:3 
 .avatar-pick { display: flex; flex-wrap: wrap; gap: 8px; }
 .avatar-pick button { width: 44px; height: 44px; border-radius: 12px; background: var(--s2); font-size: 22px; border: 2px solid transparent; }
 .avatar-pick button.active { border-color: var(--tx); }
+.avatar-pick button.photo { overflow: hidden; padding: 0; font-size: 20px; }
+.avatar-pick img, .avatar img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.avatar { overflow: hidden; }
 
 /* ---------- perfil ---------- */
 .avatar { width: 40px; height: 40px; border-radius: 50%; display: grid; place-items: center; background: var(--s2); font-size: 18px; }
@@ -457,15 +460,31 @@ img.lb { transform: scale(1.34); } /* esconde as faixas pretas do hqdefault 4:3 
 }
 .nd-hero img { width: 84px; aspect-ratio: 9 / 16; object-fit: cover; border-radius: 10px; flex: none; background: var(--s2); }
 .nd-hero h2 { font-size: 19px; line-height: 1.25; letter-spacing: -0.02em; margin: 0 0 6px; }
-.nd-list { list-style: none; margin: 16px 0 0; padding: 0; display: grid; grid-template-columns: minmax(0, 1fr); gap: 6px; }
-.nd-list button {
-  display: flex; align-items: center; gap: 10px; width: 100%; min-height: 44px; padding: 0 12px;
-  border: 0; border-radius: 10px; background: var(--s2); color: var(--tx); font: inherit; font-size: 14px; text-align: left; cursor: pointer;
+/* capas dos outros dramas novos, numa fileira com rolagem lateral */
+.nd-covers {
+  list-style: none; margin: 16px -20px 0; padding: 0 20px; display: grid; grid-auto-flow: column; grid-auto-columns: 96px;
+  gap: 10px; overflow-x: auto; scrollbar-width: none; scroll-snap-type: x proximity;
 }
-.nd-t { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.nd-go { font-size: 12.5px; color: var(--mu); flex: none; }
+.nd-covers::-webkit-scrollbar { display: none; }
+.nd-covers li { scroll-snap-align: start; min-width: 0; }
+.nd-covers button {
+  display: grid; gap: 4px; width: 100%; padding: 0; border: 0; background: none; color: var(--tx);
+  font: inherit; text-align: left; cursor: pointer;
+}
+.nd-c { position: relative; display: block; aspect-ratio: 9 / 16; border-radius: 10px; overflow: hidden; background: var(--s2); }
+.nd-c img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.nd-c .nd-ai { position: absolute; top: 6px; left: 6px; }
+.nd-ct { font-size: 12.5px; line-height: 1.3; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.nd-cw { font-size: 11px; color: var(--mu); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.nd-covers .nd-moreb {
+  place-content: center; aspect-ratio: 9 / 16; border-radius: 10px; background: var(--s2);
+  font-size: 22px; font-weight: 700; text-align: center;
+}
+.nd-moreb small { font-size: 11px; font-weight: 500; color: var(--mu); }
 .nd-ai { font-size: 10.5px; font-weight: 700; padding: 2px 6px; border-radius: 6px; background: var(--tx); color: var(--ink); flex: none; }
-.nd-more { margin: 10px 2px 0; }
+.nd-sub { font-size: 12px; font-weight: 600; color: var(--mu); margin: 16px 0 8px; }
+.nd-secs { display: flex; flex-wrap: wrap; gap: 6px; }
+.nd-secs .chip b { margin-left: 4px; font-weight: 700; opacity: .7; }
 .nd-actions { display: grid; grid-template-columns: 1fr auto; gap: 8px; margin-top: 18px; }
 .nd-actions .ghost { padding: 0 22px; }
 @keyframes nd-fade { from { opacity: 0 } }
