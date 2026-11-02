@@ -3,7 +3,7 @@
 App de short dramas (estilo DramaBox/ReelShort) para assistir séries curtas em episódios verticais,
 sem paywall e com catálogo próprio. Feito para a Julia.
 
-- **Frontend:** React 19 + Vite + React Router, PWA. Hospedado no **Netlify**.
+- **Frontend:** React 19 + Vite + React Router, PWA. Hospedado no **Vercel** (ou Netlify).
 - **Dados:** **Supabase** (Postgres + login anônimo + Edge Functions). Não tem servidor próprio.
 - **Conteúdo:** quatro fontes legítimas:
   1. **Canais oficiais no YouTube** das plataformas de short drama (ShortMax, MoboReels, StardustTV),

@@ -18,6 +18,10 @@ Thumbs.db
 
 # segredos locais
 .env
+.vercel
 
 # moodboard do Jesse (arte de terceiros, so local)
 frontend/ui designs/
+
+.vercel
+.env*
